@@ -1,0 +1,77 @@
+name: with artifact image inline cache
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+          
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          tags: my-app:latest
+          outputs: type=docker,dest=/tmp/myimage.tar
+
+      - name: Upload Docker image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+         name: myimage
+         path: /tmp/myimage.tar
+          
+      
+  re-build-from-artifacts:
+    runs-on: ubuntu-latest
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    needs: build-and-upload
+
+    steps:
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: network=host
+       
+    - name: Download Docker image artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: myimage
+        path: /tmp
+      
+    - name: Load Docker image
+      run: |
+        docker load --input /tmp/myimage.tar
+        docker image ls -a
+      
+    - name: Push to local Docker registry
+      run: |
+        docker image tag my-app localhost:5000/my-app:latest
+        docker push localhost:5000/my-app:latest
+        docker image ls -a
+        
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Rebuild using local registry cache
+      uses: docker/build-push-action@v6
+      with:
+        push: true
+        pull: true
+        tags: localhost:5000/my-app:latest
+        
+    - name: Check 
+      run: |
+        docker image ls -a
