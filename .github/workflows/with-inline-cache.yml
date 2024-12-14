@@ -19,6 +19,7 @@ jobs:
           push: false
           tags: my-app:latest
           outputs: type=docker,dest=/tmp/myimage.tar
+          cache-to: type=inline
 
       - name: Upload Docker image as artifact
         uses: actions/upload-artifact@v4
@@ -71,6 +72,7 @@ jobs:
         push: true
         pull: true
         tags: localhost:5000/my-app:latest
+        cache-from: type=registry,ref=localhost:5000/my-app:latest
         
     - name: Check 
       run: |
